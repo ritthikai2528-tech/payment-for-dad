@@ -1,1 +1,122 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>payment for dad</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* ก๊อปปี้ CSS เดิมทั้งหมดของคุณมาวางที่นี่ */
+    :root { --bg-color: #1e2235; --shadow-light: #272d45; --shadow-dark: #141726; --text-main: #dce3f0; --text-muted: #7a85a8; --grad-primary: linear-gradient(135deg, #6e8efb, #a777e3); --grad-success: linear-gradient(135deg, #11998e, #38ef7d); --grad-danger: linear-gradient(135deg, #ff416c, #ff4b2b); }
+    body { font-family: 'Prompt', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px 15px; }
+    /* ... (CSS ส่วนที่เหลือเหมือนเดิม) ... */
+    .neu-card { background-color: var(--bg-color); border-radius: 20px; padding: 25px; box-shadow: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light); margin-bottom: 20px; }
+    .neu-input { width: 100%; padding: 10px; border-radius: 10px; border:none; background: var(--bg-color); color: white; box-shadow: inset 4px 4px 8px var(--shadow-dark); margin-bottom: 10px; }
+    .neu-btn { width: 100%; padding: 12px; border-radius: 12px; border:none; color: white; cursor: pointer; font-weight: bold; box-shadow: 4px 4px 8px var(--shadow-dark); }
+    .btn-gradient { background: var(--grad-primary); }
+    .btn-success { background: var(--grad-success); }
+  </style>
+</head>
+<body>
 
+<div id="errBanner" style="display:none; color:red; padding:10px;"></div>
+
+<div class="neu-card">
+  <h3>Payment for Dad (GitHub Edition)</h3>
+  <label>เลือกผู้บันทึก</label>
+  <select id="userSelect" class="neu-input" onchange="changeUser()"><option>กำลังโหลด...</option></select>
+  
+  <label>บันทึกด่วน (รายจ่าย)</label>
+  <input type="number" id="mAmt" class="neu-input" placeholder="0.00">
+  <input type="text" id="mNote" class="neu-input" placeholder="หมายเหตุ">
+  <input type="date" id="mDate" class="neu-input">
+  <button class="neu-btn btn-success" onclick="saveManual()">บันทึกรายการ</button>
+</div>
+
+<div class="neu-card">
+  <canvas id="myChart" style="height:200px;"></canvas>
+</div>
+
+<script>
+  // 1. สำคัญ: เปลี่ยนเป็น URL ของคุณที่ได้จากการ Deploy GAS
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbzMHqRqyOI9PzLdOAxVNVYzAfn6x8_K8RAn6AiFgNS4NGJ6EuUK-EpmJ8HaXJ5zSnOxCg/exec"; 
+
+  let userList = [], currentUser = {name: 'User'};
+  let myChartInstance = null;
+
+  async function callGAS(action, payload = {}) {
+    try {
+      const response = await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action, payload })
+      });
+      return await response.json();
+    } catch (err) {
+      document.getElementById('errBanner').style.display = 'block';
+      document.getElementById('errBanner').innerText = "API Error: " + err;
+      return { success: false };
+    }
+  }
+
+  async function loadUsers() {
+    const res = await callGAS('getRecorders');
+    if(res.success) {
+      userList = res.data;
+      let html = '';
+      userList.forEach((u, i) => html += `<option value="${i}">${u.name}</option>`);
+      document.getElementById('userSelect').innerHTML = html;
+      changeUser();
+    }
+  }
+
+  function changeUser() {
+    const idx = document.getElementById('userSelect').value;
+    currentUser = userList[idx];
+  }
+
+  async function saveManual() {
+    const payload = {
+      type: 'รายจ่าย',
+      date: document.getElementById('mDate').value,
+      amount: document.getElementById('mAmt').value,
+      note: document.getElementById('mNote').value,
+      recorderName: currentUser.name
+    };
+    const res = await callGAS('saveManualEntry', payload);
+    if(res.success) {
+      alert("บันทึกสำเร็จ! คงเหลือ: " + res.balance);
+      loadDashboard();
+    }
+  }
+
+  async function loadDashboard() {
+    const res = await callGAS('getDashboardData', {start: '', end: ''});
+    if(res) {
+      renderChart(res.chartLabels, res.chartIncome, res.chartExpense);
+    }
+  }
+
+  function renderChart(labels, inc, exp) {
+    const ctx = document.getElementById('myChart').getContext('2d');
+    if(myChartInstance) myChartInstance.destroy();
+    myChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'รายรับ', data: inc, backgroundColor: '#38ef7d' },
+          { label: 'รายจ่าย', data: exp, backgroundColor: '#ff4b2b' }
+        ]
+      }
+    });
+  }
+
+  window.onload = () => {
+    document.getElementById('mDate').value = new Date().toISOString().split('T')[0];
+    loadUsers();
+    loadDashboard();
+  };
+</script>
+</body>
+</html>
