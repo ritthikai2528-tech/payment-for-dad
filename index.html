@@ -98,7 +98,6 @@
     .add-user-sidebar.active { left:0; }
     .profile-ring { width:100px; height:100px; border-radius:50%; object-fit:cover; border:3px solid #6e8efb; box-shadow:0 0 20px rgba(110,142,251,0.4); cursor:pointer; transition:all 0.2s ease; display:block; margin:0 auto; }
     .profile-ring:hover { box-shadow:0 0 28px rgba(110,142,251,0.7); }
-    /* Upload spinner overlay */
     .img-uploading { position:relative; }
     .img-uploading::after { content:'⏳'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:24px; }
     @media print {
@@ -311,91 +310,27 @@
 </div>
 
 <script>
-  // 1. สำคัญ: เปลี่ยนเป็น URL ของคุณที่ได้จากการ Deploy GAS
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbzMHqRqyOI9PzLdOAxVNVYzAfn6x8_K8RAn6AiFgNS4NGJ6EuUK-EpmJ8HaXJ5zSnOxCg/exec"; 
+// 1. ระบุ URL ของ Web App (Google Apps Script) ที่ Deploy ไว้
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzMHqRqyOI9PzLdOAxVNVYzAfn6x8_K8RAn6AiFgNS4NGJ6EuUK-EpmJ8HaXJ5zSnOxCg/exec";
 
-  let userList = [], currentUser = {name: 'User'};
-  let myChartInstance = null;
+var filesToProcess=[], currentIndex=0, bulkData=[], myChartInstance=null, lastSaveData=null;
+var userList=[], currentUser={name:'ไม่ระบุ',phone:'-',image:'-'};
 
-  // ฟังก์ชันกลางสำหรับเรียกใช้ API ข้ามโดเมนอย่างปลอดภัย
+// ฟังก์ชันศูนย์กลางเรียก API ไปยัง Google Apps Script ข้ามโดเมน
 async function callGAS(action, payload = {}) {
   try {
     const response = await fetch(GAS_URL, {
-      redirect: "follow",          // สำคัญ: GAS มักจะ redirect URL ตอนรับข้อมูล
+      redirect: "follow",
       method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8" // สำคัญ: ใช้ text/plain เลี่ยงปัญหา CORS Block
-      },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: action, payload: payload })
     });
-    
-    // ตรวจสอบว่าแปลงเป็น JSON ได้สำเร็จหรือไม่
-    const result = await response.json();
-    return result;
-    
+    return await response.json();
   } catch (err) {
-    document.getElementById('errBanner').style.display = 'block';
-    document.getElementById('errBanner').innerText = "เกิดข้อผิดพลาดการเชื่อมต่อ API: " + err.toString();
-    console.error("API Call Error:", err);
+    showErr("API Error: " + err.toString());
     return { success: false, message: err.toString() };
   }
 }
-
-  async function loadUsers() {
-    const res = await callGAS('getRecorders');
-    if(res.success) {
-      userList = res.data;
-      let html = '';
-      userList.forEach((u, i) => html += `<option value="${i}">${u.name}</option>`);
-      document.getElementById('userSelect').innerHTML = html;
-      changeUser();
-    }
-  }
-
-  function changeUser() {
-    const idx = document.getElementById('userSelect').value;
-    currentUser = userList[idx];
-  }
-
-  async function saveManual() {
-    const payload = {
-      type: 'รายจ่าย',
-      date: document.getElementById('mDate').value,
-      amount: document.getElementById('mAmt').value,
-      note: document.getElementById('mNote').value,
-      recorderName: currentUser.name
-    };
-    const res = await callGAS('saveManualEntry', payload);
-    if(res.success) {
-      alert("บันทึกสำเร็จ! คงเหลือ: " + res.balance);
-      loadDashboard();
-    }
-  }
-
-  async function loadDashboard() {
-    const res = await callGAS('getDashboardData', {start: '', end: ''});
-    if(res) {
-      renderChart(res.chartLabels, res.chartIncome, res.chartExpense);
-    }
-  }
-
-  function renderChart(labels, inc, exp) {
-    const ctx = document.getElementById('myChart').getContext('2d');
-    if(myChartInstance) myChartInstance.destroy();
-    myChartInstance = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          { label: 'รายรับ', data: inc, backgroundColor: '#38ef7d' },
-          { label: 'รายจ่าย', data: exp, backgroundColor: '#ff4b2b' }
-        ]
-      }
-    });
-  }
-
-  var filesToProcess=[], currentIndex=0, bulkData=[], myChartInstance=null, lastSaveData=null;
-var userList=[], currentUser={name:'ไม่ระบุ',phone:'-',image:'-'};
 
 function showErr(msg){
   var b=document.getElementById('errBanner');
@@ -404,7 +339,7 @@ function showErr(msg){
   setTimeout(function(){b.style.display='none';},6000);
 }
 
-function editRecord(rowIndex, date, type, amount, note) {
+async function editRecord(rowIndex, date, type, amount, note) {
   const newDate = prompt("แก้ไขวันที่ (ปปปป-ดด-วว):", date);
   if (newDate === null) return; 
 
@@ -414,15 +349,14 @@ function editRecord(rowIndex, date, type, amount, note) {
   const newNote = prompt("แก้ไขหมายเหตุ:", note);
   if (newNote === null) return;
 
-  google.script.run.withSuccessHandler(function(res) {
-    if (res.success) {
-      alert(res.message);
-      searchRecords(); 
-      loadDashboard(); 
-    } else {
-      alert(res.message);
-    }
-  }).updateRecord(rowIndex, newDate, type, newAmount, newNote);
+  const res = await callGAS('updateRecord', {rowIndex, date: newDate, type, amount: newAmount, note: newNote});
+  if (res.success) {
+    alert(res.message);
+    searchRecords(); 
+    loadDashboard(); 
+  } else {
+    alert(res.message);
+  }
 }
 
 function uploadAppImage(key, input) {
@@ -431,34 +365,23 @@ function uploadAppImage(key, input) {
   var origSrc=imgEl.src;
   imgEl.style.opacity='0.4';
   var reader=new FileReader();
-  reader.onload=function(e){
+  reader.onload = async function(e) {
     imgEl.src=e.target.result; 
-    google.script.run
-      .withSuccessHandler(function(res){
-        imgEl.style.opacity='1';
-        if(res.success){imgEl.src=res.url;}
-        else{imgEl.src=origSrc;showErr('อัปโหลดไม่สำเร็จ: '+res.message);}
-        input.value='';
-      })
-      .withFailureHandler(function(err){
-        imgEl.style.opacity='1';imgEl.src=origSrc;
-        showErr('uploadAppImage: '+err.message);input.value='';
-      })
-      .saveAppImage(key, e.target.result, input.files[0].name);
+    const res = await callGAS('saveAppImage', {key: key, base64: e.target.result, fileName: input.files[0].name});
+    imgEl.style.opacity='1';
+    if(res.success){ imgEl.src=res.url; }
+    else { imgEl.src=origSrc; showErr('อัปโหลดไม่สำเร็จ: '+res.message); }
+    input.value='';
   };
   reader.readAsDataURL(input.files[0]);
 }
 
-function loadAppImages(){
-  google.script.run
-    .withSuccessHandler(function(res){
-      if(res.success){
-        if(res.logo) document.getElementById('imgLogoMain').src=res.logo;
-        if(res.logo2) document.getElementById('imgLogo2').src=res.logo2;
-      }
-    })
-    .withFailureHandler(function(){}) 
-    .getAppImages();
+async function loadAppImages(){
+  const res = await callGAS('getAppImages');
+  if(res.success){
+    if(res.logo) document.getElementById('imgLogoMain').src=res.logo;
+    if(res.logo2) document.getElementById('imgLogo2').src=res.logo2;
+  }
 }
 
 function toggleSidebar(id){
@@ -513,71 +436,69 @@ function previewProfileImage(input){
     r.readAsDataURL(input.files[0]);
   }
 }
-function saveUserSidebar(){
+async function saveUserSidebar(){
   var name=document.getElementById('newUserName').value.trim();
   var phone=document.getElementById('newUserPhone').value.trim()||'-';
   var editRow=document.getElementById('editUserRow').value;
   var oldImage=document.getElementById('editUserOldImage').value;
   var fileInput=document.getElementById('profileImageFile');
   if(!name) return alert('กรุณากรอกชื่อผู้ใช้งานครับ');
+  
   var btn=document.getElementById('btnSaveNewUser');
   btn.innerText='กำลังบันทึก...';btn.disabled=true;
-  function doSave(imageUrl){
+  
+  async function doSave(imageUrl){
     if(editRow){
-      google.script.run
-        .withSuccessHandler(function(res){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;if(res.success){alert('แก้ไขข้อมูลเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}else alert('เกิดข้อผิดพลาด: '+res.message);})
-        .withFailureHandler(function(err){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;showErr('updateRecorder: '+err.message);})
-        .updateRecorder(parseInt(editRow),name,phone,imageUrl);
+      const res = await callGAS('updateRecorder', {rowIndex: parseInt(editRow), name, phone, imageUrl});
+      btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;
+      if(res.success){alert('แก้ไขข้อมูลเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}
+      else alert('เกิดข้อผิดพลาด: '+res.message);
     } else {
-      google.script.run
-        .withSuccessHandler(function(res){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;if(res.success){alert('เพิ่มผู้ใช้งานเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}else alert('เกิดข้อผิดพลาด: '+res.message);})
-        .withFailureHandler(function(err){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;showErr('addRecorder: '+err.message);})
-        .addNewRecorder(name,phone,imageUrl);
+      const res = await callGAS('addNewRecorder', {name, phone, imageUrl});
+      btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;
+      if(res.success){alert('เพิ่มผู้ใช้งานเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}
+      else alert('เกิดข้อผิดพลาด: '+res.message);
     }
   }
+  
   if(fileInput.files&&fileInput.files[0]){
     var reader=new FileReader();
-    reader.onload=function(e){
+    reader.onload = async function(e){
       btn.innerText='กำลังอัปโหลดรูป...';
-      google.script.run
-        .withSuccessHandler(function(res){if(res.success){doSave(res.url);}else{btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;alert('อัปโหลดรูปไม่สำเร็จ: '+res.message);}})
-        .withFailureHandler(function(err){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;showErr('uploadImage: '+err.message);})
-        .uploadProfileImage(e.target.result,fileInput.files[0].name);
+      const res = await callGAS('uploadProfileImage', {base64: e.target.result, fileName: fileInput.files[0].name});
+      if(res.success){ doSave(res.url); }
+      else { btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;alert('อัปโหลดรูปไม่สำเร็จ: '+res.message); }
     };
     reader.readAsDataURL(fileInput.files[0]);
   } else {
     doSave(oldImage||'https://cdn-icons-png.flaticon.com/512/3135/3135715.png');
   }
 }
-function deleteUser(){
+async function deleteUser(){
   var editRow=document.getElementById('editUserRow').value;
   var name=document.getElementById('newUserName').value;
   if(!editRow) return;
   if(!confirm('ยืนยันการลบผู้ใช้ "'+name+'"?\nลบแล้วไม่สามารถกู้คืนได้')) return;
-  google.script.run
-    .withSuccessHandler(function(res){if(res.success){alert('ลบผู้ใช้งานเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}else alert('เกิดข้อผิดพลาด: '+res.message);})
-    .withFailureHandler(function(err){showErr('deleteUser: '+err.message);})
-    .deleteRecorderRow(parseInt(editRow));
+  
+  const res = await callGAS('deleteRecorderRow', {rowIndex: parseInt(editRow)});
+  if(res.success){alert('ลบผู้ใช้งานเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}
+  else alert('เกิดข้อผิดพลาด: '+res.message);
 }
 
-function loadUsers(){
-  google.script.run
-    .withSuccessHandler(function(res){
-      var sel=document.getElementById('userSelect');
-      if(res.success&&res.data.length>0){
-        userList=res.data;
-        var html='<option value="">-- โปรดเลือกผู้บันทึก --</option>';
-        for(var i=0;i<userList.length;i++) html+='<option value="'+i+'">'+userList[i].name+'</option>';
-        sel.innerHTML=html;
-        var saved=localStorage.getItem('activeUserIndex');
-        if(saved!==null&&userList[saved]){sel.value=saved;changeUser();}
-        else{sel.value="0";changeUser();}
-      } else {
-        sel.innerHTML='<option value="">ยังไม่มีข้อมูล กด + เพิ่มใหม่</option>';
-      }
-    })
-    .withFailureHandler(function(err){document.getElementById('userSelect').innerHTML='<option value="">โหลดไม่ได้</option>';showErr('loadUsers: '+err.message);})
-    .getRecorders();
+async function loadUsers(){
+  const res = await callGAS('getRecorders');
+  var sel=document.getElementById('userSelect');
+  if(res.success&&res.data.length>0){
+    userList=res.data;
+    var html='<option value="">-- โปรดเลือกผู้บันทึก --</option>';
+    for(var i=0;i<userList.length;i++) html+='<option value="'+i+'">'+userList[i].name+'</option>';
+    sel.innerHTML=html;
+    var saved=localStorage.getItem('activeUserIndex');
+    if(saved!==null&&userList[saved]){sel.value=saved;changeUser();}
+    else{sel.value="0";changeUser();}
+  } else {
+    sel.innerHTML='<option value="">ยังไม่มีข้อมูล กด + เพิ่มใหม่</option>';
+  }
 }
 function changeUser(){
   var idx=document.getElementById('userSelect').value;
@@ -603,11 +524,16 @@ function processNextFile(){
   var file=filesToProcess[currentIndex];
   btn.disabled=true;btn.innerText="กำลังอ่านภาพที่ "+(currentIndex+1)+"/"+filesToProcess.length+"...";
   var reader=new FileReader();
-  reader.onload=function(e){
-    google.script.run
-      .withSuccessHandler(function(res){if(res.success){var d={index:currentIndex,fileName:file.name,date:res.data.date,amount:res.data.amount,note:res.data.note||'',fileUrl:res.fileUrl,type:document.getElementById('defaultSlipType').value};bulkData.push(d);renderVerifyItem(d);}else showErr("ภาพที่ "+(currentIndex+1)+": "+res.message);currentIndex++;processNextFile();})
-      .withFailureHandler(function(err){showErr("ภาพที่ "+(currentIndex+1)+": "+err.message);currentIndex++;processNextFile();})
-      .processSlipImage(e.target.result,file.name);
+  reader.onload = async function(e){
+    const res = await callGAS('processSlipImage', {base64: e.target.result, fileName: file.name});
+    if(res.success){
+      var d={index:currentIndex,fileName:file.name,date:res.data.date,amount:res.data.amount,note:res.data.note||'',fileUrl:res.fileUrl,type:document.getElementById('defaultSlipType').value};
+      bulkData.push(d);renderVerifyItem(d);
+    } else {
+      showErr("ภาพที่ "+(currentIndex+1)+": "+res.message);
+    }
+    currentIndex++;
+    processNextFile();
   };
   reader.readAsDataURL(file);
 }
@@ -618,8 +544,7 @@ function renderVerifyItem(data){
   c.insertAdjacentHTML('beforeend','<div class="verify-item" id="item_'+data.index+'"><h4>'+data.fileName+'</h4><select id="type_'+data.index+'" class="neu-input" style="padding:8px;"><option value="รายรับ" '+s1+'>รายรับ</option><option value="รายจ่าย" '+s2+'>รายจ่าย</option></select><div class="input-group" style="margin-top:10px;"><input type="date" id="date_'+data.index+'" value="'+data.date+'" class="neu-input" style="padding:8px;flex:1;"><input type="number" id="amount_'+data.index+'" value="'+data.amount+'" class="neu-input" style="padding:8px;flex:1;"></div><input type="text" id="note_'+data.index+'" value="'+data.note+'" placeholder="หมายเหตุ" class="neu-input" style="padding:8px;margin-top:10px;"></div>');
 }
 
-// โค้ดปรับแก้ที่ 3: ระบบบันทึกแบบป้องกันข้อมูลซ้ำสำหรับอัปโหลดผ่านสลิป 
-function saveAllData(){
+async function saveAllData(){
   var records=[];
   for(var i=0;i<bulkData.length;i++){
     var d=bulkData[i];
@@ -627,35 +552,36 @@ function saveAllData(){
   }
   var btn=document.getElementById('saveBtn');btn.innerText="กำลังบันทึก...";btn.disabled=true;
   
-  google.script.run.withSuccessHandler(function(res){
-    btn.innerText="บันทึกข้อมูลทั้งหมดลงระบบ";
-    if(res.success){
-      lastSaveData={startRow:res.startRow,numRows:res.numRows};
-      if(res.numRows > 0) document.getElementById('undoBtn').style.display='block';
-      else document.getElementById('undoBtn').style.display='none';
+  const res = await callGAS('saveMultipleToDatabase', records);
+  btn.innerText="บันทึกข้อมูลทั้งหมดลงระบบ";
+  if(res.success){
+    lastSaveData={startRow:res.startRow,numRows:res.numRows};
+    if(res.numRows > 0) document.getElementById('undoBtn').style.display='block';
+    else document.getElementById('undoBtn').style.display='none';
 
-      // แสดงข้อความสรุปผลการบันทึก / การข้ามของซ้ำ
-      var msgHtml = `<p style="text-align:center;color:${res.numRows > 0 ? '#38ef7d' : '#ff4b2b'};font-weight:bold;">${res.message}</p>`;
-      if (res.skipped > 0) msgHtml += `<p style="text-align:center;color:#ff4b2b;font-size:14px;">(ข้ามยอดซ้ำ ${res.skipped} รายการ)</p>`;
+    var msgHtml = `<p style="text-align:center;color:${res.numRows > 0 ? '#38ef7d' : '#ff4b2b'};font-weight:bold;">${res.message}</p>`;
+    if (res.skipped > 0) msgHtml += `<p style="text-align:center;color:#ff4b2b;font-size:14px;">(ข้ามยอดซ้ำ ${res.skipped} รายการ)</p>`;
 
-      document.getElementById('verifyListContainer').innerHTML = msgHtml;
-      document.getElementById('slipInput').value='';
-      document.getElementById('previewContainer').innerHTML='';
-      loadDashboard();
-    }else{
-      btn.disabled=false;showErr(res.message);
-    }
-  }).withFailureHandler(function(err){
-    document.getElementById('saveBtn').innerText="บันทึกข้อมูลทั้งหมดลงระบบ";
-    document.getElementById('saveBtn').disabled=false;
-    showErr('saveAllData: '+err.message);
-  }).saveMultipleToDatabase(records);
+    document.getElementById('verifyListContainer').innerHTML = msgHtml;
+    document.getElementById('slipInput').value='';
+    document.getElementById('previewContainer').innerHTML='';
+    loadDashboard();
+  } else {
+    btn.disabled=false;showErr(res.message);
+  }
 }
 
-function undoSave(){if(!lastSaveData||!confirm("ยืนยันการยกเลิกรายการที่เพิ่งบันทึก?"))return;google.script.run.withSuccessHandler(function(res){if(res.success){alert(res.message);document.getElementById('undoBtn').style.display='none';loadDashboard();}}).withFailureHandler(function(err){showErr('undoSave: '+err.message);}).undoLastSave(lastSaveData.startRow,lastSaveData.numRows);}
+async function undoSave(){
+  if(!lastSaveData||!confirm("ยืนยันการยกเลิกรายการที่เพิ่งบันทึก?"))return;
+  const res = await callGAS('undoLastSave', {startRow: lastSaveData.startRow, numRows: lastSaveData.numRows});
+  if(res.success){
+    alert(res.message);document.getElementById('undoBtn').style.display='none';loadDashboard();
+  } else {
+    showErr('undoSave: '+res.message);
+  }
+}
 
-// โค้ดปรับแก้ที่ 4: ระบบแจ้งเตือนบันทึกซ้ำผ่านการกรอกมือ
-function saveManual() {
+async function saveManual() {
   const type   = document.getElementById('mType').value;
   const date   = document.getElementById('mDate').value;
   const amount = parseFloat(document.getElementById('mAmt').value);
@@ -667,41 +593,29 @@ function saveManual() {
   const selectedOption = document.getElementById('userSelect').selectedOptions[0];
   const recorderName   = selectedOption ? selectedOption.text : 'กรอกด้วยตนเอง';
 
-  const btn = document.getElementById('manualSaveBtn'); // ใช้ ID ตรงๆ
+  const btn = document.getElementById('manualSaveBtn'); 
   btn.disabled = true;
   btn.innerHTML = '⏳ กำลังบันทึก...';
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      btn.disabled = false;
-      btn.innerHTML = '&#128190; บันทึกรายการนี้';
-      if (res.success) {
-        const balFmt = res.balance.toLocaleString('th-TH', { minimumFractionDigits: 2 });
-        if (res.numRows > 0) {
-          alert('✅ บันทึกสำเร็จ!\n💳 คงเหลือ: ' + balFmt + ' บาท');
-        } else {
-          alert('⚠️ ตรวจพบข้อมูลซ้ำในระบบ ไม่บันทึกซ้ำ\n💳 คงเหลือ: ' + balFmt + ' บาท');
-        }
-        document.getElementById('mAmt').value = '';
-        document.getElementById('mNote').value = '';
-        loadDashboard();
-      } else {
-        showErr('บันทึกไม่สำเร็จ: ' + res.message);
-      }
-    })
-    .withFailureHandler(function(err) {
-      btn.disabled = false;
-      btn.innerHTML = '&#128190; บันทึกรายการนี้';
-      showErr('เกิดข้อผิดพลาด: ' + err.message);
-    })
-    .saveManualEntry({
-      type:         type,
-      date:         date,
-      amount:       amount,
-      note:         note,
-      recorderName: recorderName,
-      fileUrl:      ''
-    });
+  const payload = { type, date, amount, note, recorderName, fileUrl: '' };
+  const res = await callGAS('saveManualEntry', payload);
+  
+  btn.disabled = false;
+  btn.innerHTML = '&#128190; บันทึกรายการนี้';
+  
+  if (res.success) {
+    const balFmt = res.balance.toLocaleString('th-TH', { minimumFractionDigits: 2 });
+    if (res.numRows > 0) {
+      alert('✅ บันทึกสำเร็จ!\n💳 คงเหลือ: ' + balFmt + ' บาท');
+    } else {
+      alert('⚠️ ตรวจพบข้อมูลซ้ำในระบบ ไม่บันทึกซ้ำ\n💳 คงเหลือ: ' + balFmt + ' บาท');
+    }
+    document.getElementById('mAmt').value = '';
+    document.getElementById('mNote').value = '';
+    loadDashboard();
+  } else {
+    showErr('บันทึกไม่สำเร็จ: ' + res.message);
+  }
 }
 
 function setQuickFilter(type){
@@ -717,7 +631,17 @@ function setQuickFilter(type){
   loadDashboard();
 }
 function clearTabs(){var tabs=document.querySelectorAll('.btn-tab');for(var i=0;i<tabs.length;i++)tabs[i].classList.remove('active');document.getElementById('dashboardTitle').innerText='สรุปยอด: กำหนดเอง';}
-function loadDashboard(){google.script.run.withSuccessHandler(updateDashboardUI).withFailureHandler(function(err){showErr('loadDashboard: '+err.message);}).getDashboardData(document.getElementById('startDate').value,document.getElementById('endDate').value);}
+
+async function loadDashboard(){
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  const res = await callGAS('getDashboardData', {start, end});
+  if(res.income !== undefined) {
+    updateDashboardUI(res);
+  } else {
+    showErr('loadDashboard: ' + res.message);
+  }
+}
 
 function updateDashboardUI(data) {
   document.getElementById('totalIncome').innerText = data.income.toLocaleString('th-TH', {minimumFractionDigits: 2});
@@ -741,13 +665,15 @@ function renderChart(labels,inc,exp){
   Chart.defaults.font.family="'Prompt', sans-serif";Chart.defaults.color='#7a85a8';
   myChartInstance=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'รายรับ',data:inc,backgroundColor:'#38ef7d',borderRadius:6},{label:'รายจ่าย',data:exp,backgroundColor:'#ff4b2b',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,grid:{color:'rgba(20,23,38,0.5)'}},x:{grid:{display:false}}}}});
 }
-function confirmDeleteMonth(){
+async function confirmDeleteMonth(){
   var month=document.getElementById('deleteMonthInput').value;
   if(!month||!confirm('ยืนยันการลบข้อมูลเดือน '+month+'?\nลบแล้วไม่สามารถกู้คืนได้!'))return;
-  google.script.run.withSuccessHandler(function(res){if(res.success){alert(res.message);loadDashboard();}else showErr(res.message);}).withFailureHandler(function(err){showErr('deleteMonth: '+err.message);}).deleteMonthlyData(month);
+  const res = await callGAS('deleteMonthlyData', month);
+  if(res.success){alert(res.message);loadDashboard();}
+  else showErr(res.message);
 }
 
-function searchRecords(){
+async function searchRecords(){
   var start = document.getElementById('searchStart').value;
   var end = document.getElementById('searchEnd').value;
   var keyword = document.getElementById('searchKeyword').value;
@@ -756,41 +682,50 @@ function searchRecords(){
   tbody.innerHTML = '<tr><td colspan="7" class="empty-row">กำลังค้นหา...</td></tr>';
   document.getElementById('searchSummary').style.display = 'none';
 
-  google.script.run.withSuccessHandler(function(res){
-    if(!res.success || res.records.length === 0){
-      tbody.innerHTML = '<tr><td colspan="7" class="empty-row">ไม่พบข้อมูล</td></tr>'; return;
-    }
+  const res = await callGAS('getRecords', {start, end, keyword});
+  
+  if(!res.success || !res.records || res.records.length === 0){
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">ไม่พบข้อมูล</td></tr>'; return;
+  }
+  
+  var tI = 0, tE = 0, rows = '';
+  res.records.forEach(r => {
+    if(r.type === 'รายรับ') tI += r.amount; else tE += r.amount;
+    var bc = r.type === 'รายรับ' ? 'badge-income' : 'badge-expense';
+    var ac = r.type === 'รายรับ' ? '#38ef7d' : '#ff4b2b';
+    var sl = (r.fileUrl && r.fileUrl !== 'Manual Entry') ? '<a href="'+r.fileUrl+'" target="_blank">🖼️</a>' : '⌨️';
     
-    var tI = 0, tE = 0, rows = '';
-    res.records.forEach(r => {
-      if(r.type === 'รายรับ') tI += r.amount; else tE += r.amount;
-      var bc = r.type === 'รายรับ' ? 'badge-income' : 'badge-expense';
-      var ac = r.type === 'รายรับ' ? '#38ef7d' : '#ff4b2b';
-      var sl = (r.fileUrl && r.fileUrl !== 'Manual Entry') ? '<a href="'+r.fileUrl+'" target="_blank">🖼️</a>' : '⌨️';
-      
-      rows += '<tr id="row_'+r.rowIndex+'">' +
-                '<td style="text-align:center;"><input type="checkbox" class="row-checkbox checkbox-neu" value="'+r.rowIndex+'"></td>' +
-                '<td>'+r.date+'</td>' +
-                '<td><span class="'+bc+'">'+r.type+'</span></td>' +
-                '<td style="text-align:right;color:'+ac+';">'+r.amount.toLocaleString()+'</td>' +
-                '<td>'+(r.note || '-')+'</td>' +
-                '<td style="text-align:center;">'+sl+'</td>' +
-                '<td style="text-align:center;">' +
-                  '<button class="btn-action" onclick="editRecord('+r.rowIndex+', \''+r.date+'\', \''+r.type+'\', '+r.amount+', \''+r.note+'\')">✏️</button>' +
-                  '<button class="btn-del" onclick="confirmDeleteRecord('+r.rowIndex+')">🗑️</button>' +
-                '</td>' +
-              '</tr>';
-    });
-    
-    document.getElementById('searchCountText').innerText = 'พบ ' + res.records.length + ' รายการ';
-    document.getElementById('searchSummary').style.display = 'flex';
-    tbody.innerHTML = rows;
-  }).getRecords(start, end, keyword);
+    rows += '<tr id="row_'+r.rowIndex+'">' +
+              '<td style="text-align:center;"><input type="checkbox" class="row-checkbox checkbox-neu" value="'+r.rowIndex+'"></td>' +
+              '<td>'+r.date+'</td>' +
+              '<td><span class="'+bc+'">'+r.type+'</span></td>' +
+              '<td style="text-align:right;color:'+ac+';">'+r.amount.toLocaleString()+'</td>' +
+              '<td>'+(r.note || '-')+'</td>' +
+              '<td style="text-align:center;">'+sl+'</td>' +
+              '<td style="text-align:center;">' +
+                '<button class="btn-action" onclick="editRecord('+r.rowIndex+', \''+r.date+'\', \''+r.type+'\', '+r.amount+', \''+r.note+'\')">✏️</button>' +
+                '<button class="btn-del" onclick="confirmDeleteRecord('+r.rowIndex+')">🗑️</button>' +
+              '</td>' +
+            '</tr>';
+  });
+  
+  document.getElementById('searchCountText').innerText = 'พบ ' + res.records.length + ' รายการ';
+  document.getElementById('searchSummary').style.display = 'flex';
+  tbody.innerHTML = rows;
 }
 
-function confirmDeleteRecord(rowIndex){
+async function confirmDeleteRecord(rowIndex){
   if(!confirm('ยืนยันการลบรายการนี้?\nลบแล้วไม่สามารถกู้คืนได้'))return;
-  google.script.run.withSuccessHandler(function(res){if(res.success){var row=document.getElementById('row_'+rowIndex);if(row){row.style.transition='opacity 0.4s';row.style.opacity='0';setTimeout(function(){row.remove();updateSearchSummaryAfterDelete();},400);}loadDashboard();}else showErr(res.message);}).withFailureHandler(function(err){showErr('deleteRecord: '+err.message);}).deleteRecord(rowIndex);
+  const res = await callGAS('deleteRecord', {rowIndex});
+  if(res.success){
+    var row=document.getElementById('row_'+rowIndex);
+    if(row){
+      row.style.transition='opacity 0.4s';
+      row.style.opacity='0';
+      setTimeout(function(){row.remove();updateSearchSummaryAfterDelete();},400);
+    }
+    loadDashboard();
+  } else showErr(res.message);
 }
 function updateSearchSummaryAfterDelete(){
   var rows=document.querySelectorAll('#searchTableBody tr[id^="row_"]');
@@ -799,19 +734,32 @@ function updateSearchSummaryAfterDelete(){
 }
 function toggleSelectAll(){var c=document.getElementById('selectAll').checked;var cbs=document.querySelectorAll('.row-checkbox');for(var i=0;i<cbs.length;i++)cbs[i].checked=c;updateSelectedCount();}
 function updateSelectedCount(){var n=document.querySelectorAll('.row-checkbox:checked').length;document.getElementById('selectedCount').innerText=n;document.getElementById('btnDeleteSelected').style.display=n>0?'inline-block':'none';}
-function deleteSelectedRecords(){
+
+async function deleteSelectedRecords(){
   var cbs=document.querySelectorAll('.row-checkbox:checked');if(!cbs.length)return;
   if(!confirm('ยืนยันการลบ '+cbs.length+' รายการ?\nลบแล้วไม่สามารถกู้คืนได้!'))return;
   var indices=[];for(var i=0;i<cbs.length;i++)indices.push(parseInt(cbs[i].value));
   var btn=document.getElementById('btnDeleteSelected');btn.innerText="กำลังลบ...";btn.disabled=true;
-  google.script.run.withSuccessHandler(function(res){if(res.success){alert('ลบสำเร็จ!');document.getElementById('selectAll').checked=false;searchRecords();loadDashboard();}else showErr(res.message);btn.innerHTML='ลบที่เลือก (<span id="selectedCount">0</span>)';btn.disabled=false;}).withFailureHandler(function(err){showErr('deleteSelected: '+err.message);btn.innerHTML='ลบที่เลือก (<span id="selectedCount">0</span>)';btn.disabled=false;}).deleteMultipleRecords(indices);
-}
   
-  window.onload = () => {
-    document.getElementById('mDate').value = new Date().toISOString().split('T')[0];
-    loadUsers();
+  const res = await callGAS('deleteMultipleRecords', indices);
+  if(res.success){
+    alert('ลบสำเร็จ!');
+    document.getElementById('selectAll').checked=false;
+    searchRecords();
     loadDashboard();
-  };
+  } else {
+    showErr(res.message);
+  }
+  btn.innerHTML='ลบที่เลือก (<span id="selectedCount">0</span>)';
+  btn.disabled=false;
+}
+
+window.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('mDate').value=new Date().toISOString().split('T')[0];
+  loadAppImages();
+  setQuickFilter('thisMonth');
+  loadUsers();
+});
 </script>
 </body>
 </html>
