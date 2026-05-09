@@ -7,35 +7,307 @@
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    /* ก๊อปปี้ CSS เดิมทั้งหมดของคุณมาวางที่นี่ */
-    :root { --bg-color: #1e2235; --shadow-light: #272d45; --shadow-dark: #141726; --text-main: #dce3f0; --text-muted: #7a85a8; --grad-primary: linear-gradient(135deg, #6e8efb, #a777e3); --grad-success: linear-gradient(135deg, #11998e, #38ef7d); --grad-danger: linear-gradient(135deg, #ff416c, #ff4b2b); }
-    body { font-family: 'Prompt', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px 15px; }
-    /* ... (CSS ส่วนที่เหลือเหมือนเดิม) ... */
-    .neu-card { background-color: var(--bg-color); border-radius: 20px; padding: 25px; box-shadow: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light); margin-bottom: 20px; }
-    .neu-input { width: 100%; padding: 10px; border-radius: 10px; border:none; background: var(--bg-color); color: white; box-shadow: inset 4px 4px 8px var(--shadow-dark); margin-bottom: 10px; }
-    .neu-btn { width: 100%; padding: 12px; border-radius: 12px; border:none; color: white; cursor: pointer; font-weight: bold; box-shadow: 4px 4px 8px var(--shadow-dark); }
-    .btn-gradient { background: var(--grad-primary); }
-    .btn-success { background: var(--grad-success); }
+    :root {
+      --bg-color: #1e2235;
+      --shadow-light: #272d45;
+      --shadow-dark: #141726;
+      --text-main: #dce3f0;
+      --text-muted: #7a85a8;
+      --grad-primary: linear-gradient(135deg, #6e8efb, #a777e3);
+      --grad-success: linear-gradient(135deg, #11998e, #38ef7d);
+      --grad-danger: linear-gradient(135deg, #ff416c, #ff4b2b);
+    }
+    body { font-family: 'Prompt', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px 15px; min-height: 100vh; overflow-x: hidden; }
+    h3 { color: var(--text-main); font-weight: 600; margin-top: 0; margin-bottom: 20px; text-align: center; }
+    .header-banner { max-width: 1200px; margin: 0 auto 32px auto; border-radius: 24px; background: linear-gradient(145deg, #252b42, #1a1f33); box-shadow: 10px 10px 20px var(--shadow-dark), -10px -10px 20px var(--shadow-light); padding: 28px 36px; display: flex; align-items: center; gap: 28px; position: relative; overflow: hidden; }
+    .header-logos-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; z-index: 1; }
+    .header-logo-img { width: 110px; height: 110px; object-fit: contain; border-radius: 16px; box-shadow: 5px 5px 12px var(--shadow-dark), -5px -5px 12px var(--shadow-light); background: #1e2235; cursor: pointer; transition: all 0.2s ease; position: relative; }
+    .header-logo-img:hover { box-shadow: 5px 5px 12px var(--shadow-dark), -5px -5px 12px var(--shadow-light), 0 0 0 2px #6e8efb; }
+    .img-edit-hint { font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 4px; opacity: 0; transition: opacity 0.2s; }
+    .header-logos-wrap:hover .img-edit-hint { opacity: 1; }
+    .header-title-wrap { z-index: 1; flex: 1; }
+    .header-title-wrap .title-sub { font-size: 12px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+    .header-title-wrap .title-main { font-size: 22px; font-weight: 600; background: linear-gradient(135deg, #8ab4f8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.5; margin-bottom: 12px; }
+    .header-title-wrap .title-divider { width: 50px; height: 3px; border-radius: 4px; background: var(--grad-primary); }
+    .header-logo2-wrap { flex-shrink: 0; z-index: 1; }
+    .header-logo2-img { width: 70px; height: 70px; object-fit: contain; border-radius: 12px; box-shadow: 5px 5px 12px var(--shadow-dark), -5px -5px 12px var(--shadow-light); background: #1e2235; cursor: pointer; transition: all 0.2s ease; }
+    .header-logo2-img:hover { box-shadow: 5px 5px 12px var(--shadow-dark), -5px -5px 12px var(--shadow-light), 0 0 0 2px #a777e3; }
+    @media (max-width: 600px) { .header-banner { flex-direction: column; text-align: center; padding: 24px 20px; } .header-title-wrap .title-divider { margin: 0 auto; } }
+    .app-container { display: grid; grid-template-columns: 1fr; gap: 25px; max-width: 1200px; margin: 0 auto; }
+    @media (min-width: 800px) { .app-container { grid-template-columns: 1fr 1fr; } .section-bottom { grid-column: 1 / -1; } }
+    .neu-card { background-color: var(--bg-color); border-radius: 20px; padding: 25px; box-shadow: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light); }
+    label { font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 8px; display: block; margin-top: 15px; }
+    .neu-input { width: 100%; padding: 10px 15px; border: none; outline: none; border-radius: 12px; background-color: var(--bg-color); color: var(--text-main); font-family: 'Prompt'; box-sizing: border-box; box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light); }
+    .neu-input option { background-color: #252b42; color: var(--text-main); }
+    .neu-btn { width: 100%; padding: 14px; margin-top: 25px; border: none; border-radius: 15px; font-family: 'Prompt'; font-size: 16px; font-weight: 600; cursor: pointer; color: var(--text-main); background-color: var(--bg-color); box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light); transition: all 0.2s ease; }
+    .neu-btn:active { box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light); }
+    .neu-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-gradient { background: var(--grad-primary); color: white; }
+    .btn-success { background: var(--grad-success); color: white; }
+    .btn-action { background: var(--bg-color); width: auto; font-size: 14px; margin-top: 0; color: var(--text-muted); }
+    .preview-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+    .preview-img { width: 65px; height: 65px; object-fit: cover; border-radius: 8px; box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); padding: 3px; }
+    .verify-list-container { max-height: 400px; overflow-y: auto; padding-right: 10px; }
+    .verify-item { padding: 15px; margin-bottom: 20px; border-radius: 15px; background: var(--bg-color); box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light); }
+    .verify-item h4 { margin: 0 0 10px 0; font-size: 14px; color: #a777e3; }
+    .verify-item .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+    .summary-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; margin-bottom: 25px; }
+    .summary-box { border-radius: 20px; padding: 20px; color: white; text-align: center; box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light); }
+    .summary-box.income { background: var(--grad-success); } .summary-box.expense { background: var(--grad-danger); } .summary-box.balance { background: var(--grad-primary); }
+    .summary-title { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
+    .summary-value { font-size: 26px; font-weight: 600; }
+    .chart-container { height: 350px; width: 100%; padding: 15px; border-radius: 20px; background: var(--bg-color); box-shadow: inset 6px 6px 10px var(--shadow-dark), inset -6px -6px 10px var(--shadow-light); box-sizing: border-box; }
+    .filter-tabs { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+    .btn-tab { width: auto; padding: 10px 20px; margin-top: 0; font-size: 14px; font-weight: 500; border-radius: 30px; color: var(--text-muted); background: var(--bg-color); box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light); transition: all 0.3s ease; }
+    .btn-tab.active { background: var(--grad-primary); color: white; box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2), inset -4px -4px 8px rgba(255,255,255,0.1); }
+    .ratio-wrapper { margin: 25px 0; background: linear-gradient(145deg, #252b42, #1a1f33); border-radius: 16px; padding: 20px; box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light); }
+    .ratio-bar { display: flex; height: 14px; border-radius: 10px; overflow: hidden; background: #141726; margin-bottom: 12px; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5); }
+    .ratio-in { background: var(--grad-success); transition: width 0.8s ease; }
+    .ratio-out { background: var(--grad-danger); transition: width 0.8s ease; }
+    .ratio-labels { display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; }
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; margin-bottom: 20px; }
+    .search-summary-bar { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; padding: 12px 20px; border-radius: 14px; margin-bottom: 18px; background: linear-gradient(145deg, #252b42, #1a1f33); box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light); font-size: 14px; }
+    .search-summary-bar span { color: var(--text-muted); }
+    .s-val { font-weight: 600; margin-left: 6px; }
+    .s-income { color: #38ef7d !important; } .s-expense { color: #ff4b2b !important; } .s-count { color: #8ab4f8 !important; }
+    .search-table-wrap { overflow-x: auto; border-radius: 16px; box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light); }
+    .search-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .search-table thead tr { background: linear-gradient(135deg, #6e8efb22, #a777e322); }
+    .search-table th { padding: 14px 16px; text-align: left; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid rgba(110,142,251,0.15); white-space: nowrap; }
+    .search-table td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-main); vertical-align: middle; }
+    .search-table tbody tr:hover { background: rgba(110,142,251,0.06); }
+    .search-table tbody tr:last-child td { border-bottom: none; }
+    .empty-row { text-align: center; color: var(--text-muted); padding: 40px !important; }
+    .badge-income { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; background:rgba(56,239,125,0.15); color:#38ef7d; }
+    .badge-expense { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; background:rgba(255,75,43,0.15); color:#ff4b2b; }
+    .btn-slip { font-size:18px; background:none; border:none; cursor:pointer; opacity:0.7; }
+    .btn-del { background:none; border:none; cursor:pointer; font-size:18px; color:#ff4b2b; opacity:0.7; padding:4px 8px; border-radius:8px; }
+    .checkbox-neu { width:18px; height:18px; cursor:pointer; accent-color:#ff4b2b; }
+    #errBanner { display:none; max-width:1200px; margin:0 auto 20px auto; padding:14px 20px; border-radius:14px; background:#ff4b2b22; border-left:4px solid #ff4b2b; font-size:14px; color:#ff4b2b; }
+    .credit-footer { display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:30px; padding-top:20px; border-top:1px solid rgba(110,142,251,0.18); }
+    .credit-footer-img { width:48px; height:48px; object-fit:contain; border-radius:10px; background:#1e2235; cursor:pointer; transition:all 0.2s; }
+    .credit-footer-img:hover { box-shadow:0 0 0 2px #a777e3; }
+    .overlay-bg { position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(10,12,20,0.7); z-index:99; opacity:0; visibility:hidden; transition:all 0.3s ease; backdrop-filter:blur(3px); }
+    .overlay-bg.active { opacity:1; visibility:visible; }
+    .floating-guide-btn { position:fixed; bottom:30px; right:30px; z-index:90; padding:15px 25px; border-radius:30px; width:auto; margin:0; box-shadow:6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light); }
+    .guide-sidebar { position:fixed; top:0; right:-400px; width:350px; max-width:85vw; height:100vh; background-color:var(--bg-color); z-index:100; box-shadow:-10px 0 25px rgba(0,0,0,0.5); transition:right 0.4s ease; padding:30px 20px; overflow-y:auto; box-sizing:border-box; }
+    .guide-sidebar.active { right:0; }
+    .sidebar-close-btn { position:absolute; top:20px; right:20px; background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer; }
+    .guide-box { background:linear-gradient(145deg,#252b42,#1a1f33); padding:20px; border-radius:16px; margin-bottom:20px; margin-top:20px; box-shadow:inset 4px 4px 8px var(--shadow-dark),inset -4px -4px 8px var(--shadow-light); }
+    .add-user-sidebar { position:fixed; top:0; left:-420px; width:380px; max-width:90vw; height:100vh; background:linear-gradient(145deg,#1e2235,#141726); z-index:110; box-shadow:15px 0 30px rgba(0,0,0,0.8); border-right:1px solid rgba(167,119,227,0.2); transition:left 0.4s ease; padding:30px 20px; overflow-y:auto; box-sizing:border-box; }
+    .add-user-sidebar.active { left:0; }
+    .profile-ring { width:100px; height:100px; border-radius:50%; object-fit:cover; border:3px solid #6e8efb; box-shadow:0 0 20px rgba(110,142,251,0.4); cursor:pointer; transition:all 0.2s ease; display:block; margin:0 auto; }
+    .profile-ring:hover { box-shadow:0 0 28px rgba(110,142,251,0.7); }
+    /* Upload spinner overlay */
+    .img-uploading { position:relative; }
+    .img-uploading::after { content:'⏳'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:24px; }
+    @media print {
+      .no-print, .section-left, .section-right, .floating-guide-btn, #errBanner { display:none !important; }
+      .app-container { display:block; }
+      .neu-card, .chart-container { box-shadow:none; padding:0; background:white; }
+      .summary-box { box-shadow:none; color:black !important; background:none !important; border:1px solid #ccc; }
+    }
   </style>
 </head>
 <body>
 
-<div id="errBanner" style="display:none; color:red; padding:10px;"></div>
+<div id="errBanner"></div>
 
-<div class="neu-card">
-  <h3>Payment for Dad (GitHub Edition)</h3>
-  <label>เลือกผู้บันทึก</label>
-  <select id="userSelect" class="neu-input" onchange="changeUser()"><option>กำลังโหลด...</option></select>
-  
-  <label>บันทึกด่วน (รายจ่าย)</label>
-  <input type="number" id="mAmt" class="neu-input" placeholder="0.00">
-  <input type="text" id="mNote" class="neu-input" placeholder="หมายเหตุ">
-  <input type="date" id="mDate" class="neu-input">
-  <button class="neu-btn btn-success" onclick="saveManual()">บันทึกรายการ</button>
+<input type="file" id="fileLogoMain" accept="image/*" style="display:none;" onchange="uploadAppImage('logo', this)">
+<input type="file" id="fileLogoCredit" accept="image/*" style="display:none;" onchange="uploadAppImage('logo2', this)">
+<input type="file" id="profileImageFile" accept="image/*" style="display:none;" onchange="previewProfileImage(this)">
+
+<div class="header-banner">
+  <div class="header-logos-wrap" title="คลิกรูปเพื่อเปลี่ยน">
+    <img id="imgLogoMain"
+      src="https://drive.google.com/thumbnail?id=1Uqr1lA7-UeA-Us2Ow3Zbi95zfr-7QUWC&sz=w300"
+      class="header-logo-img"
+      onclick="document.getElementById('fileLogoMain').click()"
+      alt="Logo">
+    <div class="img-edit-hint">&#9998; คลิกเพื่อเปลี่ยนรูป</div>
+  </div>
+  <div class="header-title-wrap">
+    <div class="title-sub">Monthly Finance Tracker</div>
+    <div class="title-main">ระบบบันทึกรายรับ - รายจ่าย<br>ประจำบ้าน for dad</div>
+    <div class="title-divider"></div>
+  </div>
 </div>
 
-<div class="neu-card">
-  <canvas id="myChart" style="height:200px;"></canvas>
+<div class="app-container">
+
+  <div class="neu-card section-left no-print">
+    <h3>1. อัปโหลดสลิป (สูงสุด 50 ภาพ)</h3>
+    <div style="display:flex;gap:15px;align-items:center;margin-bottom:25px;background:linear-gradient(145deg,#252b42,#1a1f33);padding:15px;border-radius:16px;box-shadow:inset 4px 4px 8px var(--shadow-dark),inset -4px -4px 8px var(--shadow-light);">
+      <img id="profileImgMain" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+        style="width:55px;height:55px;border-radius:50%;border:2px solid #6e8efb;object-fit:cover;">
+      <div style="flex:1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <label style="margin:0;color:#a777e3;">&#128100; ผู้กำลังบันทึกข้อมูล</label>
+          <div style="display:flex;gap:10px;">
+            <a href="#" onclick="openEditUser();return false;" style="font-size:12px;color:#38ef7d;text-decoration:none;">&#9998; แก้ไข</a>
+            <a href="#" onclick="openAddUser();return false;" style="font-size:12px;color:#8ab4f8;text-decoration:none;">+ เพิ่มใหม่</a>
+          </div>
+        </div>
+        <select id="userSelect" class="neu-input" onchange="changeUser()" style="padding:8px 12px;font-size:14px;background:var(--bg-color);">
+          <option value="">&#9203; กำลังโหลด...</option>
+        </select>
+      </div>
+    </div>
+    <label style="margin-top:0;">ประเภทค่าเริ่มต้นสำหรับชุดนี้</label>
+    <select id="defaultSlipType" class="neu-input">
+      <option value="รายรับ">รายรับ</option>
+      <option value="รายจ่าย">รายจ่าย</option>
+    </select>
+    <label>เลือกรูปภาพสลิป</label>
+    <input type="file" id="slipInput" accept="image/*" multiple class="neu-input" style="padding:9px 15px;">
+    <div id="previewContainer" class="preview-grid"></div>
+    <button class="neu-btn btn-gradient" id="scanBtn" onclick="scanAllSlips()">อ่านข้อมูลจากภาพทั้งหมด</button>
+  </div>
+
+  <div class="neu-card section-right no-print">
+    <h3>2. ตรวจสอบข้อมูล</h3>
+    <div id="verifyListContainer" class="verify-list-container">
+      <p style="text-align:center;color:var(--text-muted);font-size:14px;margin-top:40px;">รายการที่สแกนสำเร็จจะแสดงที่นี่</p>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:25px;">
+      <button class="neu-btn btn-success" id="saveBtn" onclick="saveAllData()" style="margin-top:0;flex:1;" disabled>บันทึกข้อมูลทั้งหมดลงระบบ</button>
+      <button class="neu-btn" id="undoBtn" onclick="undoSave()" style="margin-top:0;display:none;background:#ff4b2b;color:white;width:auto;padding:14px 20px;">&#8617; เลิกทำ</button>
+    </div>
+  </div>
+
+  <div class="neu-card section-bottom no-print">
+    <h3>&#10133; กรอกข้อมูลด้วยตนเอง (ไม่มีสลิป)</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;">
+      <div><label style="margin-top:0;">ประเภท</label><select id="mType" class="neu-input"><option value="รายรับ">รายรับ (+)</option><option value="รายจ่าย" selected>รายจ่าย (-)</option></select></div>
+      <div><label style="margin-top:0;">วันที่</label><input type="date" id="mDate" class="neu-input"></div>
+      <div><label style="margin-top:0;">ยอดเงิน (บาท)</label><input type="number" id="mAmt" class="neu-input" placeholder="0.00"></div>
+      <div><label style="margin-top:0;">หมายเหตุ</label><input type="text" id="mNote" class="neu-input" placeholder="ระบุเหตุผล"></div>
+    </div>
+    <button class="neu-btn btn-success" id="manualSaveBtn" onclick="saveManual()" style="width:auto;padding:10px 30px;margin-top:20px;">&#128190; บันทึกรายการนี้</button>
+  </div>
+
+  <div class="neu-card section-bottom">
+    <h3 class="no-print">3. สรุปยอดและรายงาน</h3>
+    <div class="no-print">
+      <h4 id="dashboardTitle" style="color:#8ab4f8;text-align:center;margin-bottom:20px;font-size:18px;">&#128202; สรุปยอด: เดือนนี้</h4>
+      <div class="filter-tabs">
+        <button class="btn-tab active" id="tab_thisMonth" onclick="setQuickFilter('thisMonth')">เดือนนี้</button>
+        <button class="btn-tab" id="tab_lastMonth" onclick="setQuickFilter('lastMonth')">เดือนที่แล้ว</button>
+        <button class="btn-tab" id="tab_thisYear" onclick="setQuickFilter('thisYear')">ปีนี้</button>
+        <button class="btn-tab" id="tab_all" onclick="setQuickFilter('all')">ทั้งหมด</button>
+      </div>
+      <div class="filter-bar" style="justify-content:center;background:rgba(25,31,51,0.4);padding:15px 25px;border-radius:20px;box-shadow:4px 4px 8px var(--shadow-dark),-4px -4px 8px var(--shadow-light);">
+        <div><label style="margin-top:0;">ตั้งแต่วันที่</label><input type="date" id="startDate" class="neu-input" onchange="clearTabs()"></div>
+        <div><label style="margin-top:0;">ถึงวันที่</label><input type="date" id="endDate" class="neu-input" onchange="clearTabs()"></div>
+        <button class="neu-btn btn-action" onclick="loadDashboard()" style="background:var(--grad-primary);color:white;border-radius:12px;">&#128269; ค้นหา</button>
+        <button class="neu-btn btn-action" onclick="window.print()" style="border-radius:12px;">&#128424; พิมพ์รายงาน</button>
+      </div>
+    </div>
+    <div class="summary-container">
+      <div class="summary-box income"><div class="summary-title">รวมรายรับ</div><div class="summary-value" id="totalIncome">0.00</div></div>
+      <div class="summary-box expense"><div class="summary-title">รวมรายจ่าย</div><div class="summary-value" id="totalExpense">0.00</div></div>
+      <div class="summary-box balance"><div class="summary-title">คงเหลือ</div><div class="summary-value" id="totalBalance">0.00</div></div>
+    </div>
+    <div class="ratio-wrapper">
+      <div style="text-align:center;margin-bottom:10px;color:var(--text-muted);font-size:13px;">สัดส่วนการเงิน (รายรับ vs รายจ่าย)</div>
+      <div class="ratio-bar"><div id="barIncome" class="ratio-in" style="width:50%;"></div><div id="barExpense" class="ratio-out" style="width:50%;"></div></div>
+      <div class="ratio-labels">
+        <span style="color:#38ef7d;">รายรับ <span id="pctIncome" style="font-size:18px;">50%</span></span>
+        <span style="color:#ff4b2b;">รายจ่าย <span id="pctExpense" style="font-size:18px;">50%</span></span>
+      </div>
+    </div>
+    <div class="chart-container"><canvas id="myChart"></canvas></div>
+    <hr style="border:1px solid var(--shadow-dark);margin:40px 0 20px 0;opacity:0.3;" class="no-print">
+    <div class="no-print">
+      <h4 style="color:#ff4b2b;margin-top:0;">&#9888; โซนจัดการข้อมูล (ลบรายเดือน)</h4>
+      <div class="filter-bar">
+        <div><input type="month" id="deleteMonthInput" class="neu-input"></div>
+        <button class="neu-btn" style="background:var(--grad-danger);color:white;width:auto;margin-top:0;padding:10px 20px;" onclick="confirmDeleteMonth()">&#128465; ยืนยันการลบ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="neu-card section-bottom no-print">
+    <h3>4. ค้นหาและจัดการข้อมูลแบบละเอียด</h3>
+    <div class="filter-bar">
+      <div><label style="margin-top:0;">ตั้งแต่วันที่</label><input type="date" id="searchStart" class="neu-input"></div>
+      <div><label style="margin-top:0;">ถึงวันที่</label><input type="date" id="searchEnd" class="neu-input"></div>
+      <div style="flex:1;min-width:160px;"><label style="margin-top:0;">ค้นหาจากหมายเหตุ</label><input type="text" id="searchKeyword" class="neu-input" placeholder="พิมพ์คำค้นหา..."></div>
+      <button class="neu-btn btn-gradient" onclick="searchRecords()" style="margin-top:0;width:auto;padding:10px 22px;">&#128269; ค้นหา</button>
+    </div>
+    <div id="searchSummary" style="display:none;" class="search-summary-bar">
+      <div style="flex:1;display:flex;gap:20px;flex-wrap:wrap;">
+        <span id="searchCountText"></span><span id="searchIncomeText"></span><span id="searchExpenseText"></span>
+      </div>
+      <button class="neu-btn" id="btnDeleteSelected" onclick="deleteSelectedRecords()" style="background:#ff4b2b;color:white;width:auto;margin-top:0;padding:8px 15px;display:none;">&#128465; ลบที่เลือก (<span id="selectedCount">0</span>)</button>
+    </div>
+    <div class="search-table-wrap">
+      <table class="search-table">
+        <thead><tr>
+          <th style="width:40px;text-align:center;"><input type="checkbox" id="selectAll" class="checkbox-neu" onclick="toggleSelectAll()"></th>
+          <th>วันที่</th><th>ประเภท</th><th>จำนวนเงิน (บาท)</th><th>หมายเหตุ</th><th>สลิป</th><th>ลบ</th>
+        </tr></thead>
+        <tbody id="searchTableBody"><tr><td colspan="7" class="empty-row">กรอกเงื่อนไขแล้วกด "ค้นหา"</td></tr></tbody>
+      </table>
+    </div>
+    <div class="credit-footer no-print">
+      <div style="text-align:right;">
+        <img id="imgLogo2"
+          src="https://drive.google.com/thumbnail?id=10W11oyUgommPP0Kn-kLXSehG4dO3v8w2=w200"
+          class="credit-footer-img"
+          onclick="document.getElementById('fileLogoCredit').click()"
+          title="คลิกเพื่อเปลี่ยนรูป" alt="Logo 2">
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">&#9998; เปลี่ยนรูป</div>
+      </div>
+      <span class="credit-text">Credit By RitWetZA</span>
+    </div>
+  </div>
+</div>
+
+<div id="appOverlay" class="overlay-bg no-print" onclick="closeAllSidebars()"></div>
+<button class="neu-btn btn-gradient floating-guide-btn no-print" onclick="toggleSidebar('guideSidebar')">&#128214; คู่มือ</button>
+
+<div id="guideSidebar" class="guide-sidebar no-print">
+  <button class="sidebar-close-btn" onclick="closeAllSidebars()">&#10006;</button>
+  <h3 style="text-align:left;margin-bottom:5px;">&#128214; คู่มือระบบ</h3>
+  <div style="width:40px;height:3px;background:var(--grad-primary);border-radius:2px;"></div>
+  <div class="guide-box">
+    <h4 style="color:#a777e3;margin-top:0;font-size:15px;">&#128241; 1. การใช้ผ่าน LINE Bot</h4>
+    <ul style="color:var(--text-muted);font-size:13px;">
+      <li><strong style="color:#ff4b2b;">บันทึกรายจ่าย:</strong> แชร์สลิปให้ Bot บันทึกเป็นรายจ่ายอัตโนมัติ</li>
+      <li><strong style="color:#38ef7d;">บันทึกรายรับ:</strong> พิมพ์ in, รับ หรือ + ในบันทึกช่วยจำของแอปธนาคาร</li>
+    </ul>
+  </div>
+  <div class="guide-box">
+    <h4 style="color:#6e8efb;margin-top:0;font-size:15px;">&#128247; 2. การเปลี่ยนรูปภาพ</h4>
+    <ul style="color:var(--text-muted);font-size:13px;">
+      <li>คลิกที่รูปโลโก้ด้านบนซ้ายเพื่อเปลี่ยน</li>
+      <li>คลิกที่รูป Credit ด้านล่างขวาเพื่อเปลี่ยน</li>
+      <li>รูปโปรไฟล์ผู้บันทึก: กด &#9998; แก้ไข</li>
+      <li>รูปจะบันทึกไว้ถาวรในระบบ</li>
+    </ul>
+  </div>
+</div>
+
+<div id="addUserSidebar" class="add-user-sidebar no-print">
+  <button class="sidebar-close-btn" onclick="closeSidebarUser()">&#10006;</button>
+  <h3 id="sidebarTitle" style="text-align:left;margin-bottom:5px;margin-top:40px;">&#10024; เพิ่มผู้บันทึกใหม่</h3>
+  <div style="width:40px;height:3px;background:var(--grad-primary);border-radius:2px;margin-bottom:25px;"></div>
+  <div style="text-align:center;margin-bottom:8px;">
+    <img id="profilePreview" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+      class="profile-ring"
+      onclick="document.getElementById('profileImageFile').click()"
+      title="คลิกเพื่อเปลี่ยนรูป">
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">คลิกที่รูปเพื่อเปลี่ยน</div>
+  </div>
+  <label style="color:#8ab4f8;margin-top:10px;">&#128100; ชื่อ-นามสกุล (หรือชื่อเล่น)</label>
+  <input type="text" id="newUserName" class="neu-input" placeholder="เช่น พ่อ, แม่, ริท">
+  <label style="color:#8ab4f8;">&#128222; เบอร์โทรศัพท์ (ไม่บังคับ)</label>
+  <input type="text" id="newUserPhone" class="neu-input" placeholder="08X-XXX-XXXX">
+  <input type="hidden" id="editUserRow" value="">
+  <input type="hidden" id="editUserOldImage" value="">
+  <button class="neu-btn btn-gradient" id="btnSaveNewUser" onclick="saveUserSidebar()" style="margin-top:30px;">&#128640; บันทึกโปรไฟล์</button>
+  <button class="neu-btn" id="btnDeleteUser" onclick="deleteUser()" style="margin-top:10px;background:var(--grad-danger);color:white;display:none;">&#128465; ลบผู้ใช้งานนี้</button>
 </div>
 
 <script>
