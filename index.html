@@ -45,19 +45,29 @@
   let userList = [], currentUser = {name: 'User'};
   let myChartInstance = null;
 
-  async function callGAS(action, payload = {}) {
-    try {
-      const response = await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action, payload })
-      });
-      return await response.json();
-    } catch (err) {
-      document.getElementById('errBanner').style.display = 'block';
-      document.getElementById('errBanner').innerText = "API Error: " + err;
-      return { success: false };
-    }
+  // ฟังก์ชันกลางสำหรับเรียกใช้ API ข้ามโดเมนอย่างปลอดภัย
+async function callGAS(action, payload = {}) {
+  try {
+    const response = await fetch(GAS_URL, {
+      redirect: "follow",          // สำคัญ: GAS มักจะ redirect URL ตอนรับข้อมูล
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8" // สำคัญ: ใช้ text/plain เลี่ยงปัญหา CORS Block
+      },
+      body: JSON.stringify({ action: action, payload: payload })
+    });
+    
+    // ตรวจสอบว่าแปลงเป็น JSON ได้สำเร็จหรือไม่
+    const result = await response.json();
+    return result;
+    
+  } catch (err) {
+    document.getElementById('errBanner').style.display = 'block';
+    document.getElementById('errBanner').innerText = "เกิดข้อผิดพลาดการเชื่อมต่อ API: " + err.toString();
+    console.error("API Call Error:", err);
+    return { success: false, message: err.toString() };
   }
+}
 
   async function loadUsers() {
     const res = await callGAS('getRecorders');
