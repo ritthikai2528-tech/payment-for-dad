@@ -394,6 +394,419 @@ async function callGAS(action, payload = {}) {
     });
   }
 
+  var filesToProcess=[], currentIndex=0, bulkData=[], myChartInstance=null, lastSaveData=null;
+var userList=[], currentUser={name:'ไม่ระบุ',phone:'-',image:'-'};
+
+function showErr(msg){
+  var b=document.getElementById('errBanner');
+  b.style.display='block';
+  b.innerHTML='<strong>Error:</strong> '+msg;
+  setTimeout(function(){b.style.display='none';},6000);
+}
+
+function editRecord(rowIndex, date, type, amount, note) {
+  const newDate = prompt("แก้ไขวันที่ (ปปปป-ดด-วว):", date);
+  if (newDate === null) return; 
+
+  const newAmount = prompt("แก้ไขจำนวนเงิน:", amount);
+  if (newAmount === null) return;
+
+  const newNote = prompt("แก้ไขหมายเหตุ:", note);
+  if (newNote === null) return;
+
+  google.script.run.withSuccessHandler(function(res) {
+    if (res.success) {
+      alert(res.message);
+      searchRecords(); 
+      loadDashboard(); 
+    } else {
+      alert(res.message);
+    }
+  }).updateRecord(rowIndex, newDate, type, newAmount, newNote);
+}
+
+function uploadAppImage(key, input) {
+  if(!input.files||!input.files[0]) return;
+  var imgEl=key==='logo'?document.getElementById('imgLogoMain'):document.getElementById('imgLogo2');
+  var origSrc=imgEl.src;
+  imgEl.style.opacity='0.4';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    imgEl.src=e.target.result; 
+    google.script.run
+      .withSuccessHandler(function(res){
+        imgEl.style.opacity='1';
+        if(res.success){imgEl.src=res.url;}
+        else{imgEl.src=origSrc;showErr('อัปโหลดไม่สำเร็จ: '+res.message);}
+        input.value='';
+      })
+      .withFailureHandler(function(err){
+        imgEl.style.opacity='1';imgEl.src=origSrc;
+        showErr('uploadAppImage: '+err.message);input.value='';
+      })
+      .saveAppImage(key, e.target.result, input.files[0].name);
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function loadAppImages(){
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res.success){
+        if(res.logo) document.getElementById('imgLogoMain').src=res.logo;
+        if(res.logo2) document.getElementById('imgLogo2').src=res.logo2;
+      }
+    })
+    .withFailureHandler(function(){}) 
+    .getAppImages();
+}
+
+function toggleSidebar(id){
+  var s=document.getElementById(id),ov=document.getElementById('appOverlay');
+  var a=s.classList.contains('active');closeAllSidebars();
+  if(!a){s.classList.add('active');ov.classList.add('active');}
+}
+function closeAllSidebars(){
+  document.getElementById('guideSidebar').classList.remove('active');
+  document.getElementById('addUserSidebar').classList.remove('active');
+  document.getElementById('appOverlay').classList.remove('active');
+}
+function closeSidebarUser(){
+  document.getElementById('addUserSidebar').classList.remove('active');
+  document.getElementById('appOverlay').classList.remove('active');
+}
+
+function resetUserSidebar(){
+  document.getElementById('sidebarTitle').innerHTML='&#10024; เพิ่มผู้บันทึกใหม่';
+  document.getElementById('newUserName').value='';
+  document.getElementById('newUserPhone').value='';
+  document.getElementById('profileImageFile').value='';
+  document.getElementById('profilePreview').src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+  document.getElementById('editUserRow').value='';
+  document.getElementById('editUserOldImage').value='';
+  document.getElementById('btnDeleteUser').style.display='none';
+}
+function openAddUser(){
+  resetUserSidebar();
+  document.getElementById('addUserSidebar').classList.add('active');
+  document.getElementById('appOverlay').classList.add('active');
+}
+function openEditUser(){
+  var idx=document.getElementById('userSelect').value;
+  if(idx===''||!userList[idx]) return alert('กรุณาเลือกผู้บันทึกที่ต้องการแก้ไขก่อนครับ');
+  var u=userList[idx];
+  document.getElementById('sidebarTitle').innerHTML='&#9998; แก้ไขข้อมูลผู้บันทึก';
+  document.getElementById('newUserName').value=u.name;
+  document.getElementById('newUserPhone').value=u.phone||'';
+  document.getElementById('profilePreview').src=u.image||'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+  document.getElementById('profileImageFile').value='';
+  document.getElementById('editUserRow').value=parseInt(idx)+2;
+  document.getElementById('editUserOldImage').value=u.image||'';
+  document.getElementById('btnDeleteUser').style.display='block';
+  document.getElementById('addUserSidebar').classList.add('active');
+  document.getElementById('appOverlay').classList.add('active');
+}
+function previewProfileImage(input){
+  if(input.files&&input.files[0]){
+    var r=new FileReader();
+    r.onload=function(e){document.getElementById('profilePreview').src=e.target.result;};
+    r.readAsDataURL(input.files[0]);
+  }
+}
+function saveUserSidebar(){
+  var name=document.getElementById('newUserName').value.trim();
+  var phone=document.getElementById('newUserPhone').value.trim()||'-';
+  var editRow=document.getElementById('editUserRow').value;
+  var oldImage=document.getElementById('editUserOldImage').value;
+  var fileInput=document.getElementById('profileImageFile');
+  if(!name) return alert('กรุณากรอกชื่อผู้ใช้งานครับ');
+  var btn=document.getElementById('btnSaveNewUser');
+  btn.innerText='กำลังบันทึก...';btn.disabled=true;
+  function doSave(imageUrl){
+    if(editRow){
+      google.script.run
+        .withSuccessHandler(function(res){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;if(res.success){alert('แก้ไขข้อมูลเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}else alert('เกิดข้อผิดพลาด: '+res.message);})
+        .withFailureHandler(function(err){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;showErr('updateRecorder: '+err.message);})
+        .updateRecorder(parseInt(editRow),name,phone,imageUrl);
+    } else {
+      google.script.run
+        .withSuccessHandler(function(res){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;if(res.success){alert('เพิ่มผู้ใช้งานเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}else alert('เกิดข้อผิดพลาด: '+res.message);})
+        .withFailureHandler(function(err){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;showErr('addRecorder: '+err.message);})
+        .addNewRecorder(name,phone,imageUrl);
+    }
+  }
+  if(fileInput.files&&fileInput.files[0]){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      btn.innerText='กำลังอัปโหลดรูป...';
+      google.script.run
+        .withSuccessHandler(function(res){if(res.success){doSave(res.url);}else{btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;alert('อัปโหลดรูปไม่สำเร็จ: '+res.message);}})
+        .withFailureHandler(function(err){btn.innerText='บันทึกโปรไฟล์';btn.disabled=false;showErr('uploadImage: '+err.message);})
+        .uploadProfileImage(e.target.result,fileInput.files[0].name);
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  } else {
+    doSave(oldImage||'https://cdn-icons-png.flaticon.com/512/3135/3135715.png');
+  }
+}
+function deleteUser(){
+  var editRow=document.getElementById('editUserRow').value;
+  var name=document.getElementById('newUserName').value;
+  if(!editRow) return;
+  if(!confirm('ยืนยันการลบผู้ใช้ "'+name+'"?\nลบแล้วไม่สามารถกู้คืนได้')) return;
+  google.script.run
+    .withSuccessHandler(function(res){if(res.success){alert('ลบผู้ใช้งานเรียบร้อยแล้วครับ');closeSidebarUser();resetUserSidebar();loadUsers();}else alert('เกิดข้อผิดพลาด: '+res.message);})
+    .withFailureHandler(function(err){showErr('deleteUser: '+err.message);})
+    .deleteRecorderRow(parseInt(editRow));
+}
+
+function loadUsers(){
+  google.script.run
+    .withSuccessHandler(function(res){
+      var sel=document.getElementById('userSelect');
+      if(res.success&&res.data.length>0){
+        userList=res.data;
+        var html='<option value="">-- โปรดเลือกผู้บันทึก --</option>';
+        for(var i=0;i<userList.length;i++) html+='<option value="'+i+'">'+userList[i].name+'</option>';
+        sel.innerHTML=html;
+        var saved=localStorage.getItem('activeUserIndex');
+        if(saved!==null&&userList[saved]){sel.value=saved;changeUser();}
+        else{sel.value="0";changeUser();}
+      } else {
+        sel.innerHTML='<option value="">ยังไม่มีข้อมูล กด + เพิ่มใหม่</option>';
+      }
+    })
+    .withFailureHandler(function(err){document.getElementById('userSelect').innerHTML='<option value="">โหลดไม่ได้</option>';showErr('loadUsers: '+err.message);})
+    .getRecorders();
+}
+function changeUser(){
+  var idx=document.getElementById('userSelect').value;
+  if(idx!==''&&userList[idx]){currentUser=userList[idx];localStorage.setItem('activeUserIndex',idx);document.getElementById('profileImgMain').src=currentUser.image||'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';}
+}
+
+document.getElementById('slipInput').addEventListener('change',function(e){
+  var files=e.target.files,c=document.getElementById('previewContainer');c.innerHTML='';
+  if(files.length>50){alert("สูงสุด 50 ภาพครับ");this.value='';return;}
+  for(var i=0;i<files.length;i++){(function(f){var r=new FileReader();r.onload=function(ev){var img=document.createElement('img');img.src=ev.target.result;img.className='preview-img';c.appendChild(img);};r.readAsDataURL(f);})(files[i]);}
+});
+function scanAllSlips(){
+  var fi=document.getElementById('slipInput');
+  if(!fi.files.length) return alert("กรุณาเลือกรูปภาพก่อนครับ");
+  if(currentUser.name==='ไม่ระบุ') return alert("กรุณาเลือกผู้บันทึกข้อมูลก่อนครับ");
+  filesToProcess=Array.prototype.slice.call(fi.files);currentIndex=0;bulkData=[];
+  document.getElementById('verifyListContainer').innerHTML='';document.getElementById('saveBtn').disabled=true;
+  processNextFile();
+}
+function processNextFile(){
+  var btn=document.getElementById('scanBtn');
+  if(currentIndex>=filesToProcess.length){btn.disabled=false;btn.innerText="อ่านข้อมูลจากภาพทั้งหมด";if(bulkData.length>0)document.getElementById('saveBtn').disabled=false;return;}
+  var file=filesToProcess[currentIndex];
+  btn.disabled=true;btn.innerText="กำลังอ่านภาพที่ "+(currentIndex+1)+"/"+filesToProcess.length+"...";
+  var reader=new FileReader();
+  reader.onload=function(e){
+    google.script.run
+      .withSuccessHandler(function(res){if(res.success){var d={index:currentIndex,fileName:file.name,date:res.data.date,amount:res.data.amount,note:res.data.note||'',fileUrl:res.fileUrl,type:document.getElementById('defaultSlipType').value};bulkData.push(d);renderVerifyItem(d);}else showErr("ภาพที่ "+(currentIndex+1)+": "+res.message);currentIndex++;processNextFile();})
+      .withFailureHandler(function(err){showErr("ภาพที่ "+(currentIndex+1)+": "+err.message);currentIndex++;processNextFile();})
+      .processSlipImage(e.target.result,file.name);
+  };
+  reader.readAsDataURL(file);
+}
+function renderVerifyItem(data){
+  var c=document.getElementById('verifyListContainer');
+  if(c.querySelector('p'))c.innerHTML='';
+  var s1=data.type==='รายรับ'?'selected':'',s2=data.type==='รายจ่าย'?'selected':'';
+  c.insertAdjacentHTML('beforeend','<div class="verify-item" id="item_'+data.index+'"><h4>'+data.fileName+'</h4><select id="type_'+data.index+'" class="neu-input" style="padding:8px;"><option value="รายรับ" '+s1+'>รายรับ</option><option value="รายจ่าย" '+s2+'>รายจ่าย</option></select><div class="input-group" style="margin-top:10px;"><input type="date" id="date_'+data.index+'" value="'+data.date+'" class="neu-input" style="padding:8px;flex:1;"><input type="number" id="amount_'+data.index+'" value="'+data.amount+'" class="neu-input" style="padding:8px;flex:1;"></div><input type="text" id="note_'+data.index+'" value="'+data.note+'" placeholder="หมายเหตุ" class="neu-input" style="padding:8px;margin-top:10px;"></div>');
+}
+
+// โค้ดปรับแก้ที่ 3: ระบบบันทึกแบบป้องกันข้อมูลซ้ำสำหรับอัปโหลดผ่านสลิป 
+function saveAllData(){
+  var records=[];
+  for(var i=0;i<bulkData.length;i++){
+    var d=bulkData[i];
+    records.push({type:document.getElementById('type_'+d.index).value,date:document.getElementById('date_'+d.index).value,amount:document.getElementById('amount_'+d.index).value,note:document.getElementById('note_'+d.index).value,fileUrl:d.fileUrl,recorderName:currentUser.name,recorderPhone:currentUser.phone,recorderImage:currentUser.image});
+  }
+  var btn=document.getElementById('saveBtn');btn.innerText="กำลังบันทึก...";btn.disabled=true;
+  
+  google.script.run.withSuccessHandler(function(res){
+    btn.innerText="บันทึกข้อมูลทั้งหมดลงระบบ";
+    if(res.success){
+      lastSaveData={startRow:res.startRow,numRows:res.numRows};
+      if(res.numRows > 0) document.getElementById('undoBtn').style.display='block';
+      else document.getElementById('undoBtn').style.display='none';
+
+      // แสดงข้อความสรุปผลการบันทึก / การข้ามของซ้ำ
+      var msgHtml = `<p style="text-align:center;color:${res.numRows > 0 ? '#38ef7d' : '#ff4b2b'};font-weight:bold;">${res.message}</p>`;
+      if (res.skipped > 0) msgHtml += `<p style="text-align:center;color:#ff4b2b;font-size:14px;">(ข้ามยอดซ้ำ ${res.skipped} รายการ)</p>`;
+
+      document.getElementById('verifyListContainer').innerHTML = msgHtml;
+      document.getElementById('slipInput').value='';
+      document.getElementById('previewContainer').innerHTML='';
+      loadDashboard();
+    }else{
+      btn.disabled=false;showErr(res.message);
+    }
+  }).withFailureHandler(function(err){
+    document.getElementById('saveBtn').innerText="บันทึกข้อมูลทั้งหมดลงระบบ";
+    document.getElementById('saveBtn').disabled=false;
+    showErr('saveAllData: '+err.message);
+  }).saveMultipleToDatabase(records);
+}
+
+function undoSave(){if(!lastSaveData||!confirm("ยืนยันการยกเลิกรายการที่เพิ่งบันทึก?"))return;google.script.run.withSuccessHandler(function(res){if(res.success){alert(res.message);document.getElementById('undoBtn').style.display='none';loadDashboard();}}).withFailureHandler(function(err){showErr('undoSave: '+err.message);}).undoLastSave(lastSaveData.startRow,lastSaveData.numRows);}
+
+// โค้ดปรับแก้ที่ 4: ระบบแจ้งเตือนบันทึกซ้ำผ่านการกรอกมือ
+function saveManual() {
+  const type   = document.getElementById('mType').value;
+  const date   = document.getElementById('mDate').value;
+  const amount = parseFloat(document.getElementById('mAmt').value);
+  const note   = document.getElementById('mNote').value.trim();
+
+  if (!date)                return showErr('กรุณาระบุวันที่');
+  if (!amount || amount <= 0) return showErr('กรุณาระบุยอดเงินที่ถูกต้อง');
+
+  const selectedOption = document.getElementById('userSelect').selectedOptions[0];
+  const recorderName   = selectedOption ? selectedOption.text : 'กรอกด้วยตนเอง';
+
+  const btn = document.getElementById('manualSaveBtn'); // ใช้ ID ตรงๆ
+  btn.disabled = true;
+  btn.innerHTML = '⏳ กำลังบันทึก...';
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      btn.disabled = false;
+      btn.innerHTML = '&#128190; บันทึกรายการนี้';
+      if (res.success) {
+        const balFmt = res.balance.toLocaleString('th-TH', { minimumFractionDigits: 2 });
+        if (res.numRows > 0) {
+          alert('✅ บันทึกสำเร็จ!\n💳 คงเหลือ: ' + balFmt + ' บาท');
+        } else {
+          alert('⚠️ ตรวจพบข้อมูลซ้ำในระบบ ไม่บันทึกซ้ำ\n💳 คงเหลือ: ' + balFmt + ' บาท');
+        }
+        document.getElementById('mAmt').value = '';
+        document.getElementById('mNote').value = '';
+        loadDashboard();
+      } else {
+        showErr('บันทึกไม่สำเร็จ: ' + res.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      btn.disabled = false;
+      btn.innerHTML = '&#128190; บันทึกรายการนี้';
+      showErr('เกิดข้อผิดพลาด: ' + err.message);
+    })
+    .saveManualEntry({
+      type:         type,
+      date:         date,
+      amount:       amount,
+      note:         note,
+      recorderName: recorderName,
+      fileUrl:      ''
+    });
+}
+
+function setQuickFilter(type){
+  var today=new Date(),start='',end='',title='';
+  var tabs=document.querySelectorAll('.btn-tab');for(var i=0;i<tabs.length;i++)tabs[i].classList.remove('active');
+  document.getElementById('tab_'+type).classList.add('active');
+  var mn=["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+  if(type==='thisMonth'){var f=new Date(today.getFullYear(),today.getMonth(),1),l=new Date(today.getFullYear(),today.getMonth()+1,0);start=new Date(f-f.getTimezoneOffset()*60000).toISOString().split('T')[0];end=new Date(l-l.getTimezoneOffset()*60000).toISOString().split('T')[0];title='สรุปยอด: เดือนนี้ ('+mn[today.getMonth()]+' '+(today.getFullYear()+543)+')';}
+  else if(type==='lastMonth'){var f=new Date(today.getFullYear(),today.getMonth()-1,1),l=new Date(today.getFullYear(),today.getMonth(),0);start=new Date(f-f.getTimezoneOffset()*60000).toISOString().split('T')[0];end=new Date(l-l.getTimezoneOffset()*60000).toISOString().split('T')[0];title='สรุปยอด: เดือนที่แล้ว';}
+  else if(type==='thisYear'){var f=new Date(today.getFullYear(),0,1),l=new Date(today.getFullYear(),11,31);start=new Date(f-f.getTimezoneOffset()*60000).toISOString().split('T')[0];end=new Date(l-l.getTimezoneOffset()*60000).toISOString().split('T')[0];title='สรุปยอด: ประจำปี '+(today.getFullYear()+543);}
+  else{title='สรุปยอด: ข้อมูลทั้งหมด';}
+  document.getElementById('startDate').value=start;document.getElementById('endDate').value=end;document.getElementById('dashboardTitle').innerText=title;
+  loadDashboard();
+}
+function clearTabs(){var tabs=document.querySelectorAll('.btn-tab');for(var i=0;i<tabs.length;i++)tabs[i].classList.remove('active');document.getElementById('dashboardTitle').innerText='สรุปยอด: กำหนดเอง';}
+function loadDashboard(){google.script.run.withSuccessHandler(updateDashboardUI).withFailureHandler(function(err){showErr('loadDashboard: '+err.message);}).getDashboardData(document.getElementById('startDate').value,document.getElementById('endDate').value);}
+
+function updateDashboardUI(data) {
+  document.getElementById('totalIncome').innerText = data.income.toLocaleString('th-TH', {minimumFractionDigits: 2});
+  document.getElementById('totalExpense').innerText = data.expense.toLocaleString('th-TH', {minimumFractionDigits: 2});
+  document.getElementById('totalBalance').innerText = data.balance.toLocaleString('th-TH', {minimumFractionDigits: 2});
+  
+  var total = data.income + data.expense;
+  var pctIn = total > 0 ? Math.round((data.income / total) * 100) : 50;
+  var pctOut = 100 - pctIn;
+  
+  document.getElementById('barIncome').style.width = pctIn + '%';
+  document.getElementById('barExpense').style.width = pctOut + '%';
+  document.getElementById('pctIncome').innerText = pctIn + '%';
+  document.getElementById('pctExpense').innerText = pctOut + '%';
+  
+  renderChart(data.chartLabels, data.chartIncome, data.chartExpense);
+}
+function renderChart(labels,inc,exp){
+  var ctx=document.getElementById('myChart').getContext('2d');
+  if(myChartInstance)myChartInstance.destroy();
+  Chart.defaults.font.family="'Prompt', sans-serif";Chart.defaults.color='#7a85a8';
+  myChartInstance=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'รายรับ',data:inc,backgroundColor:'#38ef7d',borderRadius:6},{label:'รายจ่าย',data:exp,backgroundColor:'#ff4b2b',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,grid:{color:'rgba(20,23,38,0.5)'}},x:{grid:{display:false}}}}});
+}
+function confirmDeleteMonth(){
+  var month=document.getElementById('deleteMonthInput').value;
+  if(!month||!confirm('ยืนยันการลบข้อมูลเดือน '+month+'?\nลบแล้วไม่สามารถกู้คืนได้!'))return;
+  google.script.run.withSuccessHandler(function(res){if(res.success){alert(res.message);loadDashboard();}else showErr(res.message);}).withFailureHandler(function(err){showErr('deleteMonth: '+err.message);}).deleteMonthlyData(month);
+}
+
+function searchRecords(){
+  var start = document.getElementById('searchStart').value;
+  var end = document.getElementById('searchEnd').value;
+  var keyword = document.getElementById('searchKeyword').value;
+  var tbody = document.getElementById('searchTableBody');
+  
+  tbody.innerHTML = '<tr><td colspan="7" class="empty-row">กำลังค้นหา...</td></tr>';
+  document.getElementById('searchSummary').style.display = 'none';
+
+  google.script.run.withSuccessHandler(function(res){
+    if(!res.success || res.records.length === 0){
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-row">ไม่พบข้อมูล</td></tr>'; return;
+    }
+    
+    var tI = 0, tE = 0, rows = '';
+    res.records.forEach(r => {
+      if(r.type === 'รายรับ') tI += r.amount; else tE += r.amount;
+      var bc = r.type === 'รายรับ' ? 'badge-income' : 'badge-expense';
+      var ac = r.type === 'รายรับ' ? '#38ef7d' : '#ff4b2b';
+      var sl = (r.fileUrl && r.fileUrl !== 'Manual Entry') ? '<a href="'+r.fileUrl+'" target="_blank">🖼️</a>' : '⌨️';
+      
+      rows += '<tr id="row_'+r.rowIndex+'">' +
+                '<td style="text-align:center;"><input type="checkbox" class="row-checkbox checkbox-neu" value="'+r.rowIndex+'"></td>' +
+                '<td>'+r.date+'</td>' +
+                '<td><span class="'+bc+'">'+r.type+'</span></td>' +
+                '<td style="text-align:right;color:'+ac+';">'+r.amount.toLocaleString()+'</td>' +
+                '<td>'+(r.note || '-')+'</td>' +
+                '<td style="text-align:center;">'+sl+'</td>' +
+                '<td style="text-align:center;">' +
+                  '<button class="btn-action" onclick="editRecord('+r.rowIndex+', \''+r.date+'\', \''+r.type+'\', '+r.amount+', \''+r.note+'\')">✏️</button>' +
+                  '<button class="btn-del" onclick="confirmDeleteRecord('+r.rowIndex+')">🗑️</button>' +
+                '</td>' +
+              '</tr>';
+    });
+    
+    document.getElementById('searchCountText').innerText = 'พบ ' + res.records.length + ' รายการ';
+    document.getElementById('searchSummary').style.display = 'flex';
+    tbody.innerHTML = rows;
+  }).getRecords(start, end, keyword);
+}
+
+function confirmDeleteRecord(rowIndex){
+  if(!confirm('ยืนยันการลบรายการนี้?\nลบแล้วไม่สามารถกู้คืนได้'))return;
+  google.script.run.withSuccessHandler(function(res){if(res.success){var row=document.getElementById('row_'+rowIndex);if(row){row.style.transition='opacity 0.4s';row.style.opacity='0';setTimeout(function(){row.remove();updateSearchSummaryAfterDelete();},400);}loadDashboard();}else showErr(res.message);}).withFailureHandler(function(err){showErr('deleteRecord: '+err.message);}).deleteRecord(rowIndex);
+}
+function updateSearchSummaryAfterDelete(){
+  var rows=document.querySelectorAll('#searchTableBody tr[id^="row_"]');
+  if(!rows.length){document.getElementById('searchTableBody').innerHTML='<tr><td colspan="7" class="empty-row">ไม่มีรายการเหลืออยู่</td></tr>';document.getElementById('searchSummary').style.display='none';return;}
+  document.getElementById('searchCountText').innerHTML='พบ <span class="s-val s-count">'+rows.length+'</span> รายการ';updateSelectedCount();
+}
+function toggleSelectAll(){var c=document.getElementById('selectAll').checked;var cbs=document.querySelectorAll('.row-checkbox');for(var i=0;i<cbs.length;i++)cbs[i].checked=c;updateSelectedCount();}
+function updateSelectedCount(){var n=document.querySelectorAll('.row-checkbox:checked').length;document.getElementById('selectedCount').innerText=n;document.getElementById('btnDeleteSelected').style.display=n>0?'inline-block':'none';}
+function deleteSelectedRecords(){
+  var cbs=document.querySelectorAll('.row-checkbox:checked');if(!cbs.length)return;
+  if(!confirm('ยืนยันการลบ '+cbs.length+' รายการ?\nลบแล้วไม่สามารถกู้คืนได้!'))return;
+  var indices=[];for(var i=0;i<cbs.length;i++)indices.push(parseInt(cbs[i].value));
+  var btn=document.getElementById('btnDeleteSelected');btn.innerText="กำลังลบ...";btn.disabled=true;
+  google.script.run.withSuccessHandler(function(res){if(res.success){alert('ลบสำเร็จ!');document.getElementById('selectAll').checked=false;searchRecords();loadDashboard();}else showErr(res.message);btn.innerHTML='ลบที่เลือก (<span id="selectedCount">0</span>)';btn.disabled=false;}).withFailureHandler(function(err){showErr('deleteSelected: '+err.message);btn.innerHTML='ลบที่เลือก (<span id="selectedCount">0</span>)';btn.disabled=false;}).deleteMultipleRecords(indices);
+}
+  
   window.onload = () => {
     document.getElementById('mDate').value = new Date().toISOString().split('T')[0];
     loadUsers();
